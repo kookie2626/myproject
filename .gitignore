@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environments
+.venv/
+venv/
+
+# Environment files
+.env
+
+# Local data
+/data/raw/
+/data/vectorstore/
+/data/processed/chunks_preview.json
+
+# OS/editor
+.DS_Store
+.vscode/
+.ipynb_checkpoints/
