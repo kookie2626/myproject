@@ -1,12 +1,43 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import List
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+
+REGION_KEYWORDS = ["서울", "경기", "인천", "부산", "대구", "광주", "대전", "울산", "세종"]
+STAGE_KEYWORDS = ["예비", "초기", "도약", "재도전"]
+
+
+def _extract_regions(text: str) -> str:
+    found = [region for region in REGION_KEYWORDS if region in text]
+    return "|".join(found)
+
+
+def _extract_stages(text: str) -> str:
+    found = [stage for stage in STAGE_KEYWORDS if stage in text]
+    return "|".join(found)
+
+
+def _extract_age_bucket(text: str) -> str:
+    lowered = text.replace(" ", "")
+    if "청년" in text or "만39세" in lowered or re.search(r"만\s*3[0-9]세", text):
+        return "youth"
+    if "중장년" in text or "시니어" in text:
+        return "senior"
+    return "all"
+
+
+def _annotate_metadata(doc: Document) -> None:
+    text = doc.page_content
+    doc.metadata["regions"] = _extract_regions(text)
+    doc.metadata["stages"] = _extract_stages(text)
+    doc.metadata["age_bucket"] = _extract_age_bucket(text)
 
 
 def load_pdf_documents(raw_docs_dir: str) -> List[Document]:
@@ -21,6 +52,7 @@ def load_pdf_documents(raw_docs_dir: str) -> List[Document]:
         for page in pages:
             page.metadata["source_file"] = pdf_path.name
             page.metadata["page_number"] = page.metadata.get("page", 0) + 1
+            _annotate_metadata(page)
         docs.extend(pages)
     return docs
 

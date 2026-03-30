@@ -32,11 +32,14 @@ def command_ask(question: str) -> None:
     docs = _load_base_docs(vectorstore)
 
     retriever = HybridRetriever(vectorstore=vectorstore, base_docs=docs)
-    retrieved_docs = retriever.retrieve(question).documents
+    retrieval_result = retriever.retrieve(question)
+    retrieved_docs = retrieval_result.documents
     answer = answer_with_citations(question, retrieved_docs)
 
     print("\n=== 질문 ===")
     print(question)
+    print("\n=== 적용 필터 ===")
+    print(json.dumps(retrieval_result.applied_filters, ensure_ascii=False, indent=2))
     print("\n=== 답변 ===")
     print(answer)
 
