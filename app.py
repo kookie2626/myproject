@@ -11,6 +11,7 @@ from src.config import settings
 from src.data.web_collectors import collect_and_save_default
 from src.ingest.build_index import IndexBuilder
 from src.retrieval.hybrid_retriever import HybridRetriever
+from src.rag.reranker import rerank_documents
 from src.rag.qa_chain import answer_with_citations
 
 
@@ -43,13 +44,32 @@ def command_ask(question: str) -> None:
 
     retriever = HybridRetriever(vectorstore=vectorstore, base_docs=docs)
     retrieval_result = retriever.retrieve(question)
-    retrieved_docs = retrieval_result.documents
+    reranked_docs, rerank_ok, rerank_top_score = rerank_documents(
+        query=question,
+        documents=retrieval_result.documents,
+        top_n=settings.rerank_top_n,
+        threshold=settings.rerank_threshold,
+    )
+    retrieved_docs = reranked_docs if rerank_ok else retrieval_result.documents
     answer = answer_with_citations(question, retrieved_docs)
 
     print("\n=== 질문 ===")
     print(question)
     print("\n=== 적용 필터 ===")
     print(json.dumps(retrieval_result.applied_filters, ensure_ascii=False, indent=2))
+    print("\n=== 리랭커 ===")
+    print(
+        json.dumps(
+            {
+                "rerank_ok": rerank_ok,
+                "rerank_top_score": round(rerank_top_score, 4),
+                "threshold": settings.rerank_threshold,
+                "doc_count_after_rerank": len(retrieved_docs),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
     print("\n=== 답변 ===")
     print(answer)
 

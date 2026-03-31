@@ -28,6 +28,9 @@ def _format_context(docs: List[Document]) -> str:
 
 
 def answer_with_citations(query: str, docs: List[Document]) -> str:
+    if not docs:
+        return "관련 문서를 찾지 못했습니다. 질문 조건을 완화하거나 데이터를 추가한 뒤 다시 시도해주세요."
+
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", SYSTEM_PROMPT),

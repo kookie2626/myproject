@@ -16,6 +16,8 @@ class Settings:
     processed_docs_dir: str = os.getenv("PROCESSED_DOCS_DIR", "./data/processed")
     top_k_vector: int = int(os.getenv("TOP_K_VECTOR", "8"))
     top_k_bm25: int = int(os.getenv("TOP_K_BM25", "8"))
+    rerank_top_n: int = int(os.getenv("RERANK_TOP_N", "6"))
+    rerank_threshold: float = float(os.getenv("RERANK_THRESHOLD", "0.08"))
 
 
 settings = Settings()

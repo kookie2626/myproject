@@ -5,7 +5,9 @@ import re
 from typing import List
 
 from src.ingest.build_index import IndexBuilder
+from src.config import settings
 from src.retrieval.hybrid_retriever import HybridRetriever
+from src.rag.reranker import rerank_documents
 from src.rag.qa_chain import answer_with_citations
 
 
@@ -47,12 +49,18 @@ def run_eval() -> list[dict]:
 
     for case in EVAL_CASES:
         retrieval_result = retriever.retrieve(case.question)
-        retrieved = retrieval_result.documents
+        reranked_docs, rerank_ok, rerank_top_score = rerank_documents(
+            query=case.question,
+            documents=retrieval_result.documents,
+            top_n=settings.rerank_top_n,
+            threshold=settings.rerank_threshold,
+        )
+        retrieved = reranked_docs if rerank_ok else retrieval_result.documents
         answer = answer_with_citations(case.question, retrieved)
 
         keyword_hits = [keyword for keyword in case.must_include if keyword in answer]
         has_citation = bool(re.search(r"출처\s*:", answer))
-        passed = len(keyword_hits) == len(case.must_include)
+        passed = len(retrieved) > 0 and len(keyword_hits) == len(case.must_include)
 
         if passed:
             pass_count += 1
@@ -68,6 +76,8 @@ def run_eval() -> list[dict]:
                 "keyword_hit_ratio": round(len(keyword_hits) / len(case.must_include), 3),
                 "has_citation": has_citation,
                 "retrieved_doc_count": len(retrieved),
+                "rerank_ok": rerank_ok,
+                "rerank_top_score": round(rerank_top_score, 4),
                 "applied_filters": retrieval_result.applied_filters,
             }
         )

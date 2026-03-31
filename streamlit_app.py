@@ -9,6 +9,7 @@ from src.eval.run_eval import run_eval
 from src.ingest.build_index import IndexBuilder
 from src.retrieval.hybrid_retriever import HybridRetriever
 from src.rag.qa_chain import answer_with_citations
+from src.rag.reranker import rerank_documents
 from src.config import settings
 from src.data.web_collectors import collect_and_save_default
 
@@ -72,7 +73,17 @@ if st.button("질문 실행", type="primary"):
 
             retriever = HybridRetriever(vectorstore=vectorstore, base_docs=docs)
             retrieval_result = retriever.retrieve(question)
-            answer = answer_with_citations(question, retrieval_result.documents)
+            reranked_docs, rerank_ok, rerank_top_score = rerank_documents(
+                query=question,
+                documents=retrieval_result.documents,
+                top_n=settings.rerank_top_n,
+                threshold=settings.rerank_threshold,
+            )
+            final_docs = reranked_docs if rerank_ok else retrieval_result.documents
+            answer = answer_with_citations(question, final_docs)
+
+            if not final_docs:
+                st.warning("검색된 근거 문서가 없어 안전 모드로 답변을 제한했습니다.")
 
             col1, col2 = st.columns([2, 1])
             with col1:
@@ -81,7 +92,33 @@ if st.button("질문 실행", type="primary"):
             with col2:
                 st.markdown("### 적용 필터")
                 st.code(json.dumps(retrieval_result.applied_filters, ensure_ascii=False, indent=2), language="json")
+                st.markdown("### 리랭커")
+                st.code(
+                    json.dumps(
+                        {
+                            "rerank_ok": rerank_ok,
+                            "rerank_top_score": round(rerank_top_score, 4),
+                            "threshold": settings.rerank_threshold,
+                        },
+                        ensure_ascii=False,
+                        indent=2,
+                    ),
+                    language="json",
+                )
                 st.markdown("### 검색 문서 수")
-                st.write(len(retrieval_result.documents))
+                st.write(len(final_docs))
+
+            st.markdown("### 출처 미리보기")
+            for idx, doc in enumerate(final_docs[:6], start=1):
+                meta = doc.metadata
+                source_file = meta.get("source_file", "unknown")
+                source_url = meta.get("source_url", "")
+                notice_id = meta.get("notice_id", "")
+                page_number = meta.get("page_number", "?")
+                st.markdown(
+                    f"{idx}. {source_file} p.{page_number}"
+                    + (f" | notice_id={notice_id}" if notice_id else "")
+                    + (f" | {source_url}" if source_url else "")
+                )
         except Exception as exc:
             st.error(f"질의 실행 실패: {exc}")
