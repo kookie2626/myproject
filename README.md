@@ -66,6 +66,13 @@ python app.py run-all
 - `links`: 페이지 내 링크/공고 식별자 목록 (`title`, `url`, `notice_id`)
 
 인덱싱 시 `links`는 별도 문서로 분해되어 공고 제목/URL/ID 기반 검색 정확도를 높입니다.
+또한 로그인/약관/SNS 같은 노이즈 링크는 수집 단계에서 자동 제외됩니다.
+
+## 평가 리포트 지표
+`python app.py eval` 출력에는 아래 지표가 포함됩니다.
+- `pass_rate`: 시나리오 통과율
+- `citation_rate`: 출처(출처:) 명시율
+- `keyword_hit_ratio`: 시나리오 필수 키워드 충족률
 
 ## 권장 데이터
 - K-Startup 공고문 PDF

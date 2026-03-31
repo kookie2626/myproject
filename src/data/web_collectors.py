@@ -17,6 +17,32 @@ DEFAULT_TARGETS = [
     "https://www.kosmes.or.kr/nsh/map/main.do#none",
 ]
 
+NOISE_TITLE_KEYWORDS = [
+    "로그인",
+    "회원가입",
+    "개인정보",
+    "이용약관",
+    "저작권",
+    "사이트맵",
+    "페이스북",
+    "인스타그램",
+    "유튜브",
+    "블로그",
+    "TOP",
+]
+
+NOISE_URL_KEYWORDS = [
+    "facebook.com",
+    "instagram.com",
+    "youtube.com",
+    "blog.naver.com",
+    "javascript:",
+    "/login",
+    "/join",
+    "privacy",
+    "terms",
+]
+
 
 @dataclass
 class WebRecord:
@@ -90,6 +116,19 @@ def _extract_relevant_links(url: str, html: str, max_links: int = 80) -> List[di
     return list(dedup.values())
 
 
+def _is_noise_link(link: dict) -> bool:
+    title = str(link.get("title", "")).lower()
+    url = str(link.get("url", "")).lower()
+
+    if len(title) <= 1:
+        return True
+    if any(keyword.lower() in title for keyword in NOISE_TITLE_KEYWORDS):
+        return True
+    if any(keyword in url for keyword in NOISE_URL_KEYWORDS):
+        return True
+    return False
+
+
 def collect_web_records(urls: List[str] | None = None, timeout_sec: int = 20) -> List[WebRecord]:
     target_urls = urls or DEFAULT_TARGETS
     records: List[WebRecord] = []
@@ -99,7 +138,9 @@ def collect_web_records(urls: List[str] | None = None, timeout_sec: int = 20) ->
             response = client.get(url)
             response.raise_for_status()
             title, body = _extract_main_text(response.text)
-            links = _extract_relevant_links(url, response.text)
+            links = [
+                link for link in _extract_relevant_links(url, response.text) if not _is_noise_link(link)
+            ]
             if not body:
                 continue
             records.append(

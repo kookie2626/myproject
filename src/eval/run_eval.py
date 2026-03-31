@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import List
 
 from src.ingest.build_index import IndexBuilder
@@ -40,15 +41,42 @@ def run_eval() -> list[dict]:
     retriever = HybridRetriever(vectorstore=vectorstore, base_docs=docs)
 
     report = []
+    total_cases = len(EVAL_CASES)
+    pass_count = 0
+    citation_count = 0
+
     for case in EVAL_CASES:
-        retrieved = retriever.retrieve(case.question).documents
+        retrieval_result = retriever.retrieve(case.question)
+        retrieved = retrieval_result.documents
         answer = answer_with_citations(case.question, retrieved)
-        passed = all(keyword in answer for keyword in case.must_include)
+
+        keyword_hits = [keyword for keyword in case.must_include if keyword in answer]
+        has_citation = bool(re.search(r"출처\s*:", answer))
+        passed = len(keyword_hits) == len(case.must_include)
+
+        if passed:
+            pass_count += 1
+        if has_citation:
+            citation_count += 1
+
         report.append(
             {
                 "question": case.question,
                 "passed": passed,
                 "must_include": case.must_include,
+                "keyword_hit_count": len(keyword_hits),
+                "keyword_hit_ratio": round(len(keyword_hits) / len(case.must_include), 3),
+                "has_citation": has_citation,
+                "retrieved_doc_count": len(retrieved),
+                "applied_filters": retrieval_result.applied_filters,
             }
         )
-    return report
+
+    summary = {
+        "total_cases": total_cases,
+        "passed_cases": pass_count,
+        "pass_rate": round(pass_count / total_cases, 3) if total_cases else 0,
+        "citation_rate": round(citation_count / total_cases, 3) if total_cases else 0,
+    }
+
+    return [{"summary": summary}, *report]
