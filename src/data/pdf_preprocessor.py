@@ -57,6 +57,42 @@ def load_pdf_documents(raw_docs_dir: str) -> List[Document]:
     return docs
 
 
+def load_web_json_documents(raw_docs_dir: str) -> List[Document]:
+    raw_path = Path(raw_docs_dir)
+    if not raw_path.exists():
+        return []
+
+    docs: List[Document] = []
+    for json_path in raw_path.glob("*.json"):
+        try:
+            payload = json.loads(json_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+
+        if not isinstance(payload, list):
+            continue
+
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+            body = str(item.get("body", "")).strip()
+            if not body:
+                continue
+
+            meta = {
+                "source_file": json_path.name,
+                "page_number": item.get("page_number", 1),
+                "source_site": item.get("source_site", "web"),
+                "source_url": item.get("url", ""),
+                "title": item.get("title", ""),
+            }
+            doc = Document(page_content=body, metadata=meta)
+            _annotate_metadata(doc)
+            docs.append(doc)
+
+    return docs
+
+
 def split_documents(docs: List[Document]) -> List[Document]:
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=900,

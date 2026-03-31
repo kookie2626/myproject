@@ -8,7 +8,12 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_core.documents import Document
 
 from src.config import settings
-from src.data.pdf_preprocessor import load_pdf_documents, split_documents, export_processed_chunks
+from src.data.pdf_preprocessor import (
+    export_processed_chunks,
+    load_pdf_documents,
+    load_web_json_documents,
+    split_documents,
+)
 
 
 class IndexBuilder:
@@ -17,9 +22,9 @@ class IndexBuilder:
         self.persist_dir = settings.vector_db_dir
 
     def build(self) -> tuple[int, str]:
-        raw_docs = load_pdf_documents(settings.raw_docs_dir)
+        raw_docs = load_pdf_documents(settings.raw_docs_dir) + load_web_json_documents(settings.raw_docs_dir)
         if not raw_docs:
-            raise ValueError("data/raw 폴더에 PDF가 없습니다.")
+            raise ValueError("data/raw 폴더에 PDF 또는 JSON 데이터가 없습니다.")
 
         chunks = split_documents(raw_docs)
         preview_path = export_processed_chunks(chunks, settings.processed_docs_dir)

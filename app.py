@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 
 from langchain_core.documents import Document
 
 from src.eval.run_eval import run_eval
+from src.config import settings
+from src.data.web_collectors import collect_and_save_default
 from src.ingest.build_index import IndexBuilder
 from src.retrieval.hybrid_retriever import HybridRetriever
 from src.rag.qa_chain import answer_with_citations
@@ -24,6 +27,13 @@ def command_build_index() -> None:
     chunk_count, preview_path = builder.build()
     print(f"[완료] 인덱스 생성: {chunk_count} chunks")
     print(f"[완료] 전처리 미리보기: {preview_path}")
+
+
+def command_collect_web() -> None:
+    output_path = str(Path(settings.raw_docs_dir) / "web_seed.json")
+    count, saved_path = collect_and_save_default(output_path)
+    print(f"[완료] 웹 데이터 수집: {count}건")
+    print(f"[완료] 저장 파일: {saved_path}")
 
 
 def command_ask(question: str) -> None:
@@ -54,6 +64,7 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("build-index", help="PDF 문서를 전처리하고 벡터 인덱스를 생성")
+    subparsers.add_parser("collect-web", help="기본 정책 사이트 웹 데이터를 수집해 JSON으로 저장")
 
     ask_parser = subparsers.add_parser("ask", help="질문에 대한 답변 생성")
     ask_parser.add_argument("question", type=str, help="사용자 질문")
@@ -64,6 +75,8 @@ def main() -> None:
 
     if args.command == "build-index":
         command_build_index()
+    elif args.command == "collect-web":
+        command_collect_web()
     elif args.command == "ask":
         command_ask(args.question)
     elif args.command == "eval":
