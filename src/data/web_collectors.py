@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from urllib.parse import urljoin
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,6 +24,7 @@ class WebRecord:
     url: str
     title: str
     body: str
+    links: List[dict]
 
 
 def _site_name(url: str) -> str:
@@ -57,6 +59,37 @@ def _extract_main_text(html: str) -> tuple[str, str]:
     return title, body
 
 
+def _extract_relevant_links(url: str, html: str, max_links: int = 80) -> List[dict]:
+    soup = BeautifulSoup(html, "lxml")
+    links: List[dict] = []
+
+    for a_tag in soup.select("a"):
+        href = (a_tag.get("href") or "").strip()
+        text = _clean_text(a_tag.get_text(" ", strip=True))
+        if not href or not text:
+            continue
+
+        if href.startswith("#") or href.lower().startswith("javascript:"):
+            # K-Startup 목록의 go_view(숫자) 패턴은 공고 식별자로 보존한다.
+            go_view_match = re.search(r"go_view\((\d+)\)", href)
+            if go_view_match:
+                links.append({"title": text, "url": "", "notice_id": go_view_match.group(1)})
+            continue
+
+        absolute = urljoin(url, href)
+        if absolute.startswith("http"):
+            links.append({"title": text, "url": absolute, "notice_id": ""})
+
+        if len(links) >= max_links:
+            break
+
+    dedup = {}
+    for link in links:
+        key = (link.get("title", ""), link.get("url", ""), link.get("notice_id", ""))
+        dedup[key] = link
+    return list(dedup.values())
+
+
 def collect_web_records(urls: List[str] | None = None, timeout_sec: int = 20) -> List[WebRecord]:
     target_urls = urls or DEFAULT_TARGETS
     records: List[WebRecord] = []
@@ -66,6 +99,7 @@ def collect_web_records(urls: List[str] | None = None, timeout_sec: int = 20) ->
             response = client.get(url)
             response.raise_for_status()
             title, body = _extract_main_text(response.text)
+            links = _extract_relevant_links(url, response.text)
             if not body:
                 continue
             records.append(
@@ -74,6 +108,7 @@ def collect_web_records(urls: List[str] | None = None, timeout_sec: int = 20) ->
                     url=url,
                     title=title,
                     body=body,
+                    links=links,
                 )
             )
 
@@ -90,6 +125,7 @@ def save_records_as_json(records: List[WebRecord], output_path: str) -> str:
             "url": r.url,
             "title": r.title,
             "body": r.body,
+            "links": r.links,
         }
         for r in records
     ]

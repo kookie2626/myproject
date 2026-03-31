@@ -90,6 +90,38 @@ def load_web_json_documents(raw_docs_dir: str) -> List[Document]:
             _annotate_metadata(doc)
             docs.append(doc)
 
+            # 링크 목록을 별도 문서로 만들어 검색 시 공고/상세 페이지를 더 잘 찾게 한다.
+            links = item.get("links", [])
+            if isinstance(links, list):
+                for link in links:
+                    if not isinstance(link, dict):
+                        continue
+
+                    link_title = str(link.get("title", "")).strip()
+                    link_url = str(link.get("url", "")).strip()
+                    notice_id = str(link.get("notice_id", "")).strip()
+                    if not link_title and not link_url and not notice_id:
+                        continue
+
+                    link_text = "\n".join(
+                        [
+                            f"링크 제목: {link_title}",
+                            f"링크 URL: {link_url}",
+                            f"공고 ID: {notice_id}",
+                            f"출처 사이트: {meta['source_site']}",
+                        ]
+                    ).strip()
+
+                    link_meta = dict(meta)
+                    link_meta["doc_type"] = "web_link"
+                    link_meta["link_title"] = link_title
+                    link_meta["link_url"] = link_url
+                    link_meta["notice_id"] = notice_id
+
+                    link_doc = Document(page_content=link_text, metadata=link_meta)
+                    _annotate_metadata(link_doc)
+                    docs.append(link_doc)
+
     return docs
 
 
