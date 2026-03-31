@@ -51,6 +51,8 @@ class WebRecord:
     title: str
     body: str
     links: List[dict]
+    notice_id: str = ""
+    parent_url: str = ""
 
 
 def _site_name(url: str) -> str:
@@ -106,14 +108,15 @@ def _extract_relevant_links(url: str, html: str, max_links: int = 80) -> List[di
         if absolute.startswith("http"):
             links.append({"title": text, "url": absolute, "notice_id": ""})
 
-        if len(links) >= max_links:
-            break
-
     dedup = {}
     for link in links:
         key = (link.get("title", ""), link.get("url", ""), link.get("notice_id", ""))
         dedup[key] = link
-    return list(dedup.values())
+
+    deduped = list(dedup.values())
+    notice_links = [link for link in deduped if link.get("notice_id")]
+    normal_links = [link for link in deduped if not link.get("notice_id")]
+    return (notice_links + normal_links)[:max_links]
 
 
 def _is_noise_link(link: dict) -> bool:
@@ -153,7 +156,50 @@ def collect_web_records(urls: List[str] | None = None, timeout_sec: int = 20) ->
                 )
             )
 
+            # K-Startup 목록 페이지는 notice_id 기반 상세 페이지를 추가 수집한다.
+            if _site_name(url) == "k-startup":
+                records.extend(_collect_kstartup_details(client=client, list_url=url, links=links))
+
     return records
+
+
+def _collect_kstartup_details(client: httpx.Client, list_url: str, links: List[dict], max_details: int = 20) -> List[WebRecord]:
+    details: List[WebRecord] = []
+    seen_notice_ids = set()
+
+    for link in links:
+        notice_id = str(link.get("notice_id", "")).strip()
+        if not notice_id or not notice_id.isdigit() or notice_id in seen_notice_ids:
+            continue
+        seen_notice_ids.add(notice_id)
+
+        detail_url = f"{list_url.split('?')[0]}?schM=view&pbancSn={notice_id}"
+        try:
+            response = client.get(detail_url)
+            response.raise_for_status()
+        except httpx.HTTPError:
+            continue
+
+        title, body = _extract_main_text(response.text)
+        if not body:
+            continue
+
+        details.append(
+            WebRecord(
+                source_site="k-startup-detail",
+                url=detail_url,
+                title=title,
+                body=body,
+                links=[],
+                notice_id=notice_id,
+                parent_url=list_url,
+            )
+        )
+
+        if len(details) >= max_details:
+            break
+
+    return details
 
 
 def save_records_as_json(records: List[WebRecord], output_path: str) -> str:
@@ -167,6 +213,8 @@ def save_records_as_json(records: List[WebRecord], output_path: str) -> str:
             "title": r.title,
             "body": r.body,
             "links": r.links,
+            "notice_id": r.notice_id,
+            "parent_url": r.parent_url,
         }
         for r in records
     ]
