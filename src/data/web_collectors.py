@@ -83,9 +83,20 @@ def _extract_notice_fields(text: str) -> dict:
     support_type = ""
     region = ""
 
-    m_deadline = re.search(r"마감일자\s*([0-9]{4}-[0-9]{2}-[0-9]{2}|오늘마감)", text)
-    if m_deadline:
-        deadline = m_deadline.group(1)
+    deadline_patterns = [
+        r"마감일자\s*([0-9]{4}-[0-9]{2}-[0-9]{2}|오늘마감)",
+        r"마감일자\s*([0-9]{4}\.[ ]?[0-9]{1,2}\.[ ]?[0-9]{1,2}\.)",
+        r"신청기간\s*[:：]?\s*([0-9]{4}\.[ ]?[0-9]{1,2}\.[ ]?[0-9]{1,2}\.)\s*[~〜-]\s*([0-9]{4}\.[ ]?[0-9]{1,2}\.[ ]?[0-9]{1,2}\.)",
+    ]
+    for pattern in deadline_patterns:
+        m_deadline = re.search(pattern, text)
+        if not m_deadline:
+            continue
+        if m_deadline.lastindex and m_deadline.lastindex >= 2:
+            deadline = f"{m_deadline.group(1)} ~ {m_deadline.group(2)}"
+        else:
+            deadline = m_deadline.group(1)
+        break
 
     m_org = re.search(r"\b(창업진흥원|소상공인시장진흥공단|중소벤처기업부|경기테크노파크|울산과학기술원|경기콘텐츠진흥원)\b", text)
     if m_org:
@@ -206,6 +217,7 @@ def _collect_kstartup_details(client: httpx.Client, list_url: str, links: List[d
 
     for link in links:
         notice_id = str(link.get("notice_id", "")).strip()
+        link_title = str(link.get("title", "")).strip()
         if not notice_id or not notice_id.isdigit() or notice_id in seen_notice_ids:
             continue
         seen_notice_ids.add(notice_id)
@@ -221,7 +233,7 @@ def _collect_kstartup_details(client: httpx.Client, list_url: str, links: List[d
         if not body:
             continue
 
-        fields = _extract_notice_fields(body)
+        fields = _extract_notice_fields(f"{link_title} {body}")
         details.append(
             WebRecord(
                 source_site="k-startup-detail",

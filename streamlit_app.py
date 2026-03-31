@@ -30,6 +30,23 @@ def _load_base_docs(vectorstore) -> list[Document]:
 with st.sidebar:
     st.header("파이프라인 실행")
 
+    st.markdown("---")
+    st.subheader("검색 필터")
+    selected_region = st.selectbox("지역", ["전체", "서울", "경기", "인천", "부산", "대구", "광주", "대전", "울산", "세종"])
+    selected_org = st.selectbox(
+        "기관",
+        [
+            "전체",
+            "창업진흥원",
+            "중소벤처기업부",
+            "소상공인시장진흥공단",
+            "경기테크노파크",
+            "울산과학기술원",
+            "경기콘텐츠진흥원",
+        ],
+    )
+    selected_support_type = st.selectbox("지원분야", ["전체", "사업화", "글로벌", "정책자금", "창업교육", "멘토링ㆍ컨설팅ㆍ교육", "인력"])
+
     if st.button("1) 웹 데이터 수집", use_container_width=True):
         try:
             output_path = f"{settings.raw_docs_dir}/web_seed.json"
@@ -72,7 +89,14 @@ if st.button("질문 실행", type="primary"):
             docs = _load_base_docs(vectorstore)
 
             retriever = HybridRetriever(vectorstore=vectorstore, base_docs=docs)
-            retrieval_result = retriever.retrieve(question)
+            retrieval_result = retriever.retrieve(
+                question,
+                structured_filters={
+                    "region": selected_region,
+                    "organization": selected_org,
+                    "support_type": selected_support_type,
+                },
+            )
             reranked_docs, rerank_ok, rerank_top_score = rerank_documents(
                 query=question,
                 documents=retrieval_result.documents,

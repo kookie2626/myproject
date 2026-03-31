@@ -80,7 +80,7 @@ class HybridRetriever:
     def _vector_search(self, query: str, top_k: int) -> List[Document]:
         return self.vectorstore.similarity_search(query=query, k=top_k)
 
-    def retrieve(self, query: str) -> RetrievalResult:
+    def retrieve(self, query: str, structured_filters: dict | None = None) -> RetrievalResult:
         profile = _parse_query_profile(query)
         bm25_docs = self._bm25_search(query, settings.top_k_bm25)
         vector_docs = self._vector_search(query, settings.top_k_vector)
@@ -97,12 +97,38 @@ class HybridRetriever:
         merged_docs = list(dedup.values())
         filtered_docs = [d for d in merged_docs if _is_doc_match(profile, d)]
 
+        final_docs = filtered_docs if filtered_docs else merged_docs
+        structured_filters = structured_filters or {}
+
+        def _meta_match(doc: Document) -> bool:
+            org = str(structured_filters.get("organization", "")).strip()
+            region = str(structured_filters.get("region", "")).strip()
+            support_type = str(structured_filters.get("support_type", "")).strip()
+
+            if org and org != "전체":
+                if org not in str(doc.metadata.get("organization", "")):
+                    return False
+            if region and region != "전체":
+                region_meta = str(doc.metadata.get("region", "")) + " " + str(doc.metadata.get("regions", ""))
+                if region not in region_meta:
+                    return False
+            if support_type and support_type != "전체":
+                if support_type not in str(doc.metadata.get("support_type", "")):
+                    return False
+            return True
+
+        structured_docs = [d for d in final_docs if _meta_match(d)]
+        if structured_docs:
+            final_docs = structured_docs
+
         return RetrievalResult(
-            documents=filtered_docs if filtered_docs else merged_docs,
+            documents=final_docs,
             applied_filters={
                 "regions": profile.regions,
                 "stages": profile.stages,
                 "age": profile.age,
                 "filter_hit": bool(filtered_docs),
+                "structured_filters": structured_filters,
+                "structured_filter_hit": bool(structured_docs),
             },
         )
