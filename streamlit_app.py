@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
+from pathlib import Path
 
 import streamlit as st
 from langchain_core.documents import Document
@@ -17,6 +19,31 @@ from src.data.web_collectors import collect_and_save_default
 st.set_page_config(page_title="창업지원 RAG 데모", page_icon="📄", layout="wide")
 st.title("창업지원 문서 RAG 데모")
 st.caption("웹 수집 → 인덱스 생성 → 질의응답까지 한 화면에서 실행")
+
+
+def _history_path() -> Path:
+    return Path(settings.processed_docs_dir) / "query_history.jsonl"
+
+
+def _append_query_history(row: dict) -> None:
+    path = _history_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def _load_recent_history(limit: int = 20) -> list[dict]:
+    path = _history_path()
+    if not path.exists():
+        return []
+    lines = path.read_text(encoding="utf-8").splitlines()
+    rows = []
+    for line in lines[-limit:]:
+        try:
+            rows.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return rows
 
 
 def _load_base_docs(vectorstore) -> list[Document]:
@@ -46,6 +73,14 @@ with st.sidebar:
         ],
     )
     selected_support_type = st.selectbox("지원분야", ["전체", "사업화", "글로벌", "정책자금", "창업교육", "멘토링ㆍ컨설팅ㆍ교육", "인력"])
+
+    st.markdown("---")
+    st.subheader("질의 로그")
+    recent_rows = _load_recent_history(limit=10)
+    st.caption(f"최근 로그: {len(recent_rows)}건")
+    if recent_rows:
+        for row in reversed(recent_rows[-5:]):
+            st.markdown(f"- {row.get('timestamp', '')} | {row.get('question', '')[:28]}")
 
     if st.button("1) 웹 데이터 수집", use_container_width=True):
         try:
@@ -159,5 +194,30 @@ if st.button("질문 실행", type="primary"):
 
                 if source_url:
                     st.markdown(f"- 원문: [{source_url}]({source_url})")
+
+                with st.expander(f"문서 {idx} 스니펫 보기"):
+                    st.write(doc.page_content[:800] + ("..." if len(doc.page_content) > 800 else ""))
+                    st.code(json.dumps(meta, ensure_ascii=False, indent=2), language="json")
+
+            _append_query_history(
+                {
+                    "timestamp": datetime.now().isoformat(timespec="seconds"),
+                    "question": question,
+                    "filters": {
+                        "region": selected_region,
+                        "organization": selected_org,
+                        "support_type": selected_support_type,
+                    },
+                    "retrieved_doc_count": len(final_docs),
+                    "rerank_ok": rerank_ok,
+                    "rerank_top_score": round(rerank_top_score, 4),
+                    "answer_preview": answer[:220],
+                    "source_urls": [
+                        d.metadata.get("source_url", "")
+                        for d in final_docs
+                        if str(d.metadata.get("source_url", "")).strip()
+                    ][:10],
+                }
+            )
         except Exception as exc:
             st.error(f"질의 실행 실패: {exc}")
