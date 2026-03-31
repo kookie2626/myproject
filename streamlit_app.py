@@ -16,9 +16,44 @@ from src.config import settings
 from src.data.web_collectors import collect_and_save_default
 
 
-st.set_page_config(page_title="창업지원 RAG 데모", page_icon="📄", layout="wide")
+_ABOUT_TEXT = """
+## 창업지원 문서 기반 RAG 질의응답 시스템
+
+정부·지자체 창업지원 공고문·정책자금 가이드 등 문서를 벡터 DB에 적재한 뒤,
+사용자 질문에 대해 **출처(파일명/페이지)를 명시**하며 답변하는 RAG(검색증강생성) 시스템입니다.
+
+### 핵심 기능
+- **하이브리드 검색**: BM25 키워드 검색 + 벡터(시맨틱) 검색 결합
+- **메타데이터 필터링**: 지역 / 기관 / 지원분야 조건 사전 필터
+- **리랭킹**: 임계값 기반 경량 리랭커로 검색 결과 정밀화
+- **출처 강제 표기**: 답변 말미에 `파일명 p.페이지 | URL` 형식으로 근거 제시
+- **환각 방지**: 컨텍스트 외 정보 생성 금지 정책 적용
+
+### 기술 스택
+- [LangChain](https://www.langchain.com/) · [Chroma](https://www.trychroma.com/) · OpenAI Embedding & Chat · BM25 (rank-bm25)
+
+### 데이터 출처
+K-Startup 공고문, 중소벤처기업부·소진공 정책자금 가이드, 지자체 창업지원 공고
+
+### 사용 방법
+1. 사이드바 **웹 데이터 수집** → **인덱스 생성** 순으로 실행
+2. 지역 / 기관 / 지원분야 필터 선택 후 질문 입력
+3. 답변과 함께 출처 미리보기 확인
+"""
+
+st.set_page_config(
+    page_title="창업지원 RAG 데모",
+    page_icon="📄",
+    layout="wide",
+    menu_items={
+        "About": _ABOUT_TEXT,
+    },
+)
 st.title("창업지원 문서 RAG 데모")
 st.caption("웹 수집 → 인덱스 생성 → 질의응답까지 한 화면에서 실행")
+
+with st.expander("ℹ️ 이 시스템에 대하여 (About)", expanded=False):
+    st.markdown(_ABOUT_TEXT)
 
 
 def _history_path() -> Path:
