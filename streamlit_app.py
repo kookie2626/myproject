@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -81,6 +82,70 @@ def _load_recent_history(limit: int = 20) -> list[dict]:
     return rows
 
 
+def _history_to_csv(rows: list[dict]) -> str:
+    header = [
+        "timestamp",
+        "question",
+        "region",
+        "organization",
+        "support_type",
+        "retrieved_doc_count",
+        "rerank_ok",
+        "rerank_top_score",
+        "answer_preview",
+    ]
+    lines = [",".join(header)]
+
+    for row in rows:
+        filters = row.get("filters", {}) if isinstance(row.get("filters", {}), dict) else {}
+        record = {
+            "timestamp": str(row.get("timestamp", "")),
+            "question": str(row.get("question", "")),
+            "region": str(filters.get("region", "")),
+            "organization": str(filters.get("organization", "")),
+            "support_type": str(filters.get("support_type", "")),
+            "retrieved_doc_count": str(row.get("retrieved_doc_count", "")),
+            "rerank_ok": str(row.get("rerank_ok", "")),
+            "rerank_top_score": str(row.get("rerank_top_score", "")),
+            "answer_preview": str(row.get("answer_preview", "")),
+        }
+
+        escaped = []
+        for col in header:
+            value = record[col].replace('"', '""')
+            escaped.append(f'"{value}"')
+        lines.append(",".join(escaped))
+
+    return "\n".join(lines)
+
+
+def _extract_keywords(query: str) -> list[str]:
+    tokens = re.findall(r"[가-힣A-Za-z0-9]{2,}", query)
+    seen = set()
+    uniq = []
+    for tok in tokens:
+        low = tok.lower()
+        if low in seen:
+            continue
+        seen.add(low)
+        uniq.append(tok)
+    return uniq[:8]
+
+
+def _highlight_text(text: str, keywords: list[str]) -> str:
+    highlighted = text
+    for kw in sorted(keywords, key=len, reverse=True):
+        if len(kw) < 2:
+            continue
+        highlighted = re.sub(
+            re.escape(kw),
+            lambda m: f"<mark>{m.group(0)}</mark>",
+            highlighted,
+            flags=re.IGNORECASE,
+        )
+    return highlighted
+
+
 def _load_base_docs(vectorstore) -> list[Document]:
     fetched = vectorstore.get(include=["documents", "metadatas"])
     return [
@@ -116,6 +181,21 @@ with st.sidebar:
     if recent_rows:
         for row in reversed(recent_rows[-5:]):
             st.markdown(f"- {row.get('timestamp', '')} | {row.get('question', '')[:28]}")
+
+        csv_blob = _history_to_csv(recent_rows)
+        st.download_button(
+            label="로그 CSV 다운로드",
+            data=csv_blob,
+            file_name="query_history.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+
+        failure_rows = [r for r in recent_rows if int(r.get("retrieved_doc_count", 0) or 0) == 0]
+        if failure_rows:
+            st.caption(f"근거 0건 질문: {len(failure_rows)}건")
+            for row in reversed(failure_rows[-3:]):
+                st.markdown(f"- {row.get('question', '')[:40]}")
 
     if st.button("1) 웹 데이터 수집", use_container_width=True):
         try:
@@ -203,6 +283,7 @@ if st.button("질문 실행", type="primary"):
                 st.write(len(final_docs))
 
             st.markdown("### 출처 미리보기")
+            keywords = _extract_keywords(question)
             for idx, doc in enumerate(final_docs[:6], start=1):
                 meta = doc.metadata
                 source_file = meta.get("source_file", "unknown")
@@ -231,7 +312,8 @@ if st.button("질문 실행", type="primary"):
                     st.markdown(f"- 원문: [{source_url}]({source_url})")
 
                 with st.expander(f"문서 {idx} 스니펫 보기"):
-                    st.write(doc.page_content[:800] + ("..." if len(doc.page_content) > 800 else ""))
+                    snippet = doc.page_content[:800] + ("..." if len(doc.page_content) > 800 else "")
+                    st.markdown(_highlight_text(snippet, keywords), unsafe_allow_html=True)
                     st.code(json.dumps(meta, ensure_ascii=False, indent=2), language="json")
 
             _append_query_history(

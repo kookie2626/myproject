@@ -64,6 +64,7 @@ streamlit run streamlit_app.py
 Streamlit 사이드바에서 `지역/기관/지원분야` 필터를 직접 선택해 검색 범위를 좁힐 수 있습니다.
 또한 질의 실행 시 `data/processed/query_history.jsonl`에 로그가 누적되며, 최근 로그가 사이드바에 표시됩니다.
 출처 미리보기에서 문서 스니펫과 메타데이터를 펼쳐 확인할 수 있습니다.
+로그는 CSV로 내려받을 수 있으며, `근거 0건` 질문을 자동 추려 개선 우선순위를 잡을 수 있습니다.
 
 ## 웹 수집 데이터 포맷
 `collect-web` 실행 시 `data/raw/web_seed.json` 파일이 생성됩니다.
