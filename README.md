@@ -55,11 +55,16 @@ python app.py eval
 python app.py run-all
 ```
 
+## 스트림릿 데모 실행
+```bash
+streamlit run streamlit_app.py
+```
+
 ## 웹 수집 데이터 포맷
 `collect-web` 실행 시 `data/raw/web_seed.json` 파일이 생성됩니다.
 
 레코드 스키마:
-- `source_site`: 출처 사이트 키 (`k-startup`, `kised`, `kosmes`)
+- `source_site`: 출처 사이트 키 (`k-startup`, `kised`, `kosmes`, `modoo`)
 - `url`: 원문 URL
 - `title`: 페이지 제목
 - `body`: 정제 본문 텍스트

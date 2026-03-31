@@ -15,6 +15,7 @@ DEFAULT_TARGETS = [
     "https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do",
     "https://www.kised.or.kr/menu.es?mid=a10205010000",
     "https://www.kosmes.or.kr/nsh/map/main.do#none",
+    "https://www.modoo.or.kr",
 ]
 
 NOISE_TITLE_KEYWORDS = [
@@ -62,6 +63,8 @@ def _site_name(url: str) -> str:
         return "kised"
     if "kosmes.or.kr" in url:
         return "kosmes"
+    if "modoo.or.kr" in url:
+        return "modoo"
     return "unknown"
 
 
