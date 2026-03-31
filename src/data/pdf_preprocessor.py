@@ -87,6 +87,10 @@ def load_web_json_documents(raw_docs_dir: str) -> List[Document]:
                 "title": item.get("title", ""),
                 "notice_id": item.get("notice_id", ""),
                 "parent_url": item.get("parent_url", ""),
+                "deadline": item.get("deadline", ""),
+                "organization": item.get("organization", ""),
+                "support_type": item.get("support_type", ""),
+                "region": item.get("region", ""),
             }
             doc = Document(page_content=body, metadata=meta)
             _annotate_metadata(doc)

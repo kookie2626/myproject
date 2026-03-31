@@ -115,10 +115,25 @@ if st.button("질문 실행", type="primary"):
                 source_url = meta.get("source_url", "")
                 notice_id = meta.get("notice_id", "")
                 page_number = meta.get("page_number", "?")
-                st.markdown(
-                    f"{idx}. {source_file} p.{page_number}"
-                    + (f" | notice_id={notice_id}" if notice_id else "")
-                    + (f" | {source_url}" if source_url else "")
-                )
+                deadline = meta.get("deadline", "")
+                organization = meta.get("organization", "")
+                support_type = meta.get("support_type", "")
+                region = meta.get("region", "")
+
+                line = f"{idx}. {source_file} p.{page_number}"
+                if notice_id:
+                    line += f" | notice_id={notice_id}"
+                if organization:
+                    line += f" | 기관={organization}"
+                if support_type:
+                    line += f" | 분야={support_type}"
+                if region:
+                    line += f" | 지역={region}"
+                if deadline:
+                    line += f" | 마감={deadline}"
+                st.markdown(line)
+
+                if source_url:
+                    st.markdown(f"- 원문: [{source_url}]({source_url})")
         except Exception as exc:
             st.error(f"질의 실행 실패: {exc}")

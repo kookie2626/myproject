@@ -54,6 +54,10 @@ class WebRecord:
     links: List[dict]
     notice_id: str = ""
     parent_url: str = ""
+    deadline: str = ""
+    organization: str = ""
+    support_type: str = ""
+    region: str = ""
 
 
 def _site_name(url: str) -> str:
@@ -71,6 +75,36 @@ def _site_name(url: str) -> str:
 def _clean_text(text: str) -> str:
     text = re.sub(r"\s+", " ", text)
     return text.strip()
+
+
+def _extract_notice_fields(text: str) -> dict:
+    deadline = ""
+    organization = ""
+    support_type = ""
+    region = ""
+
+    m_deadline = re.search(r"마감일자\s*([0-9]{4}-[0-9]{2}-[0-9]{2}|오늘마감)", text)
+    if m_deadline:
+        deadline = m_deadline.group(1)
+
+    m_org = re.search(r"\b(창업진흥원|소상공인시장진흥공단|중소벤처기업부|경기테크노파크|울산과학기술원|경기콘텐츠진흥원)\b", text)
+    if m_org:
+        organization = m_org.group(1)
+
+    m_support = re.search(r"\b(사업화|글로벌|정책자금|창업교육|멘토링ㆍ컨설팅ㆍ교육|인력)\b", text)
+    if m_support:
+        support_type = m_support.group(1)
+
+    m_region = re.search(r"\b(서울|경기|인천|부산|대구|광주|대전|울산|세종|강원|충북|충남|전북|전남|경북|경남|제주)\b", text)
+    if m_region:
+        region = m_region.group(1)
+
+    return {
+        "deadline": deadline,
+        "organization": organization,
+        "support_type": support_type,
+        "region": region,
+    }
 
 
 def _extract_main_text(html: str) -> tuple[str, str]:
@@ -187,6 +221,7 @@ def _collect_kstartup_details(client: httpx.Client, list_url: str, links: List[d
         if not body:
             continue
 
+        fields = _extract_notice_fields(body)
         details.append(
             WebRecord(
                 source_site="k-startup-detail",
@@ -196,6 +231,10 @@ def _collect_kstartup_details(client: httpx.Client, list_url: str, links: List[d
                 links=[],
                 notice_id=notice_id,
                 parent_url=list_url,
+                deadline=fields["deadline"],
+                organization=fields["organization"],
+                support_type=fields["support_type"],
+                region=fields["region"],
             )
         )
 
@@ -218,6 +257,10 @@ def save_records_as_json(records: List[WebRecord], output_path: str) -> str:
             "links": r.links,
             "notice_id": r.notice_id,
             "parent_url": r.parent_url,
+            "deadline": r.deadline,
+            "organization": r.organization,
+            "support_type": r.support_type,
+            "region": r.region,
         }
         for r in records
     ]

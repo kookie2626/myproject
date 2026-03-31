@@ -71,6 +71,7 @@ streamlit run streamlit_app.py
 - `body`: 정제 본문 텍스트
 - `links`: 페이지 내 링크/공고 식별자 목록 (`title`, `url`, `notice_id`)
 - `notice_id`, `parent_url`: 상세 공고 수집 시 원본 공고 식별/부모 URL
+- `deadline`, `organization`, `support_type`, `region`: 상세 공고에서 추출한 구조화 필드
 
 인덱싱 시 `links`는 별도 문서로 분해되어 공고 제목/URL/ID 기반 검색 정확도를 높입니다.
 또한 로그인/약관/SNS 같은 노이즈 링크는 수집 단계에서 자동 제외됩니다.
